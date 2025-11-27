@@ -1,0 +1,5 @@
+{
+  "name": "News Pulse AI",
+  "description": "An AI-powered news aggregator that fetches articles from various RSS feeds, provides translations in multiple languages, and offers text-to-speech audio playback for an enhanced news consumption experience.",
+  "requestFramePermissions": []
+}
