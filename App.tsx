@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { SubscriptionProvider, useSubscription } from './hooks/useSubscription';
 import { MOCK_ARTICLES, CATEGORIES, FOUNDER_BIOS, LOGO_URL, FALLBACK_ARTICLES, BRANDING_ASSET_URL } from './constants';
