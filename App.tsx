@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { SubscriptionProvider, useSubscription } from './hooks/useSubscription';
 import { MOCK_ARTICLES, CATEGORIES, FOUNDER_BIOS, LOGO_URL, FALLBACK_ARTICLES, BRANDING_ASSET_URL } from './constants';
@@ -172,45 +173,6 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article, onSelect }) => {
     );
 };
 
-const RSSFeedWidget: React.FC<{ articles: Article[] }> = ({ articles }) => (
-    <div className="bg-neutral-900 rounded-2xl border border-amber-900/30 shadow-2xl p-6 h-[500px] md:h-[600px] flex flex-col relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-             <svg className="w-32 h-32 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9zM4 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
-        </div>
-        <div className="flex items-center justify-between mb-6 border-b border-amber-900/30 pb-4 z-10">
-             <h3 className="text-amber-500 font-bold uppercase tracking-widest text-sm flex items-center gap-2">
-                <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
-                Personal Updates
-             </h3>
-             <span className="text-[10px] text-gray-500 bg-black/50 px-2 py-1 rounded">LIVE RSS</span>
-        </div>
-        
-        <div className="flex-grow overflow-y-auto pr-2 space-y-4 no-scrollbar z-10">
-            {articles.map((article) => (
-                <div key={article.id} className="bg-black/40 p-4 rounded-xl border border-neutral-800 hover:border-amber-500/30 transition-all group">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] text-amber-600 font-mono">{new Date(article.pubDate).toLocaleDateString()}</span>
-                        <a href={article.link} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-amber-500 transition-colors">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                        </a>
-                    </div>
-                    <h4 className="text-gray-200 text-sm font-medium leading-snug group-hover:text-amber-100 mb-2">
-                        {article.title}
-                    </h4>
-                    <p className="text-gray-500 text-xs line-clamp-2 leading-relaxed">
-                        {article.description}
-                    </p>
-                </div>
-            ))}
-             {articles.length === 0 && (
-                <div className="text-center text-gray-500 text-sm mt-10">
-                    No updates available via RSS.
-                </div>
-            )}
-        </div>
-    </div>
-);
-
 const FoundersSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     <div className="p-6 animate-fade-in min-h-[80vh] flex flex-col">
          <div className="mb-12 text-center max-w-3xl mx-auto">
@@ -359,8 +321,16 @@ const AppContent: React.FC = () => {
                                         title="Azad Studio Telegram"
                                     ></iframe>
                                 </div>
-                                <div className="lg:col-span-1">
-                                    <RSSFeedWidget articles={filteredArticles.slice(0, 20)} />
+                                <div className="lg:col-span-1 h-[500px] md:h-[600px]">
+                                    {/* PERSONAL UPDATES WIDGET EMBED */}
+                                    <iframe 
+                                        width="100%" 
+                                        height="100%" 
+                                        src="https://rss.app/embed/v1/feed/AA6lZH5NppIw7V1B" 
+                                        frameBorder="0"
+                                        className="rounded-2xl border border-amber-900/30 shadow-2xl bg-neutral-900"
+                                        title="Personal Updates Feed"
+                                    ></iframe>
                                 </div>
                             </div>
                         )}
