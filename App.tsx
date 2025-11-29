@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SubscriptionProvider, useSubscription } from './hooks/useSubscription';
-import { MOCK_ARTICLES, CATEGORIES, FOUNDER_BIOS, LOGO_URL, FALLBACK_ARTICLES } from './constants';
+import { MOCK_ARTICLES, CATEGORIES, FOUNDER_BIOS, LOGO_URL, FALLBACK_ARTICLES, BRANDING_ASSET_URL } from './constants';
 import { Article, Category, CategoryID } from './types';
 import ArticleView from './components/ArticleView';
 import SubscriptionModal from './components/SubscriptionModal';
-import { CrownIcon } from './components/Icons';
+import { CrownIcon, MicIcon3D } from './components/Icons';
 import { speak } from './services/ttsService';
 import { fetchCategoryNews, fetchBreakingNewsTicker } from './services/newsService';
 import { generateRomanUrduTitle } from './services/geminiService';
 import { cleanupOldArticles } from './services/storageService';
 
 
-// --- Child Components defined in the same file to keep file count low ---
+// --- Child Components ---
 
 const Logo: React.FC = () => (
     <div className="flex items-center gap-3">
@@ -46,7 +46,6 @@ const BreakingNewsTicker: React.FC = () => {
     useEffect(() => {
         const fetchBreaking = async () => {
             const news = await fetchBreakingNewsTicker();
-            // If API fails, fallback to Azad content for ticker to avoid empty state
             setBreakingNews(news.length > 0 ? news : MOCK_ARTICLES);
         };
 
@@ -67,6 +66,56 @@ const BreakingNewsTicker: React.FC = () => {
     );
 };
 
+// Welcome Overlay Component
+const WelcomeOverlay: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => {
+    const handleEnter = () => {
+        // Play Welcome Audio (Indian English Voice)
+        speak("Welcome to News Pulse AI by Azad Studio. Bringing you news in your language, anytime, anywhere.", "en-IN");
+        onDismiss();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 animate-fade-in text-center">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-900/20 via-black to-black"></div>
+            
+            <div className="relative z-10 flex flex-col items-center max-w-md w-full">
+                <div className="relative mb-8">
+                    <div className="absolute inset-0 bg-amber-500 blur-2xl opacity-20 animate-pulse-slow"></div>
+                    <img src={LOGO_URL} alt="Logo" className="w-32 h-32 rounded-full border-4 border-amber-500/50 shadow-2xl relative z-10" />
+                </div>
+
+                <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-500 to-amber-200 mb-2 font-serif">
+                    News Pulse AI
+                </h1>
+                <p className="text-amber-600 font-bold tracking-widest text-xs uppercase mb-8">
+                    Presented by Azad Studio
+                </p>
+
+                <p className="text-gray-400 mb-10 text-sm leading-relaxed max-w-xs">
+                    Experience journalism without barriers. Real-time translation, AI summaries, and voice narration in your preferred language.
+                </p>
+
+                <button 
+                    onClick={handleEnter}
+                    className="group relative px-8 py-4 bg-gradient-to-r from-amber-600 to-yellow-600 rounded-full font-bold text-black shadow-lg shadow-amber-900/40 hover:scale-105 transition-transform w-full sm:w-auto overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                    <span className="relative flex items-center justify-center gap-2">
+                        <MicIcon3D className="w-5 h-5 text-black" />
+                        Enter News Pulse
+                    </span>
+                </button>
+                
+                <div className="mt-8 flex gap-4 opacity-50">
+                     {FOUNDER_BIOS.slice(0,2).map(f => (
+                         <img key={f.name} src={f.imageUrl} className="w-8 h-8 rounded-full border border-neutral-700 grayscale" alt={f.name} />
+                     ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 interface ArticleCardProps {
   article: Article;
@@ -82,8 +131,6 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article, onSelect }) => {
             const title = await generateRomanUrduTitle(article.title, article.id);
             if (isMounted && title) setRuTitle(title);
         };
-        
-        // Small delay to prioritize main thread rendering
         const timeout = setTimeout(fetchRuTitle, 100);
         return () => {
             isMounted = false;
@@ -101,9 +148,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article, onSelect }) => {
                 src={article.imageUrl || LOGO_URL} 
                 alt={article.title} 
                 className="w-full h-44 object-cover transition-transform duration-700 group-hover:scale-105"
-                onError={(e) => {
-                    (e.target as HTMLImageElement).src = LOGO_URL;
-                }}
+                onError={(e) => { (e.target as HTMLImageElement).src = LOGO_URL; }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-60"></div>
             <span className="absolute bottom-2 right-2 text-[10px] font-bold bg-black/60 text-amber-400 px-2 py-1 rounded backdrop-blur-sm border border-amber-900/50">
@@ -112,7 +157,6 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article, onSelect }) => {
         </div>
         <div className="p-5">
           <h3 className="font-bold text-lg text-gray-100 mb-1 h-auto overflow-hidden leading-tight group-hover:text-amber-400 transition-colors">{article.title}</h3>
-          {/* Roman Urdu Title */}
           {ruTitle && (
               <h4 className="text-amber-600/80 text-sm font-serif italic mb-3 animate-fade-in-fast leading-snug">
                   {ruTitle}
@@ -127,6 +171,45 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article, onSelect }) => {
       </div>
     );
 };
+
+const RSSFeedWidget: React.FC<{ articles: Article[] }> = ({ articles }) => (
+    <div className="bg-neutral-900 rounded-2xl border border-amber-900/30 shadow-2xl p-6 h-[500px] md:h-[600px] flex flex-col relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+             <svg className="w-32 h-32 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9zM4 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        </div>
+        <div className="flex items-center justify-between mb-6 border-b border-amber-900/30 pb-4 z-10">
+             <h3 className="text-amber-500 font-bold uppercase tracking-widest text-sm flex items-center gap-2">
+                <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                Personal Updates
+             </h3>
+             <span className="text-[10px] text-gray-500 bg-black/50 px-2 py-1 rounded">LIVE RSS</span>
+        </div>
+        
+        <div className="flex-grow overflow-y-auto pr-2 space-y-4 no-scrollbar z-10">
+            {articles.map((article) => (
+                <div key={article.id} className="bg-black/40 p-4 rounded-xl border border-neutral-800 hover:border-amber-500/30 transition-all group">
+                    <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] text-amber-600 font-mono">{new Date(article.pubDate).toLocaleDateString()}</span>
+                        <a href={article.link} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-amber-500 transition-colors">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        </a>
+                    </div>
+                    <h4 className="text-gray-200 text-sm font-medium leading-snug group-hover:text-amber-100 mb-2">
+                        {article.title}
+                    </h4>
+                    <p className="text-gray-500 text-xs line-clamp-2 leading-relaxed">
+                        {article.description}
+                    </p>
+                </div>
+            ))}
+             {articles.length === 0 && (
+                <div className="text-center text-gray-500 text-sm mt-10">
+                    No updates available via RSS.
+                </div>
+            )}
+        </div>
+    </div>
+);
 
 const FoundersSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     <div className="p-6 animate-fade-in min-h-[80vh] flex flex-col">
@@ -176,11 +259,11 @@ const AppContent: React.FC = () => {
     const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
     const [currentView, setCurrentView] = useState<View>('feed');
     const [isFetching, setIsFetching] = useState(false);
+    const [showWelcome, setShowWelcome] = useState(true);
     const { checkSubscription } = useSubscription();
 
     // Initial Fetch & Daily Cleanup
     useEffect(() => {
-        // Run cleanup: remove articles older than 24h
         cleanupOldArticles(24);
 
         const loadNews = async () => {
@@ -190,30 +273,21 @@ const AppContent: React.FC = () => {
             // 1. Fetch Azad Studio from RSS
             try {
                 const azadNews = await fetchCategoryNews('azad-studio');
-                if (azadNews.length > 0) {
-                    allFetchedArticles.push(...azadNews);
-                } else {
-                    allFetchedArticles.push(...MOCK_ARTICLES);
-                }
+                if (azadNews.length > 0) allFetchedArticles.push(...azadNews);
+                else allFetchedArticles.push(...MOCK_ARTICLES);
             } catch (e) {
                 allFetchedArticles.push(...MOCK_ARTICLES);
             }
 
-            // 2. Fetch other categories in PARALLEL for speed
+            // 2. Fetch others in parallel
             const categoriesToFetch: CategoryID[] = ['hyderabad', 'telangana', 'india', 'international', 'sports'];
-            
             try {
                 const promises = categoriesToFetch.map(cat => fetchCategoryNews(cat));
                 const results = await Promise.all(promises);
-                
                 results.forEach(news => {
-                    if (news && news.length > 0) {
-                        allFetchedArticles.push(...news);
-                    }
+                    if (news && news.length > 0) allFetchedArticles.push(...news);
                 });
-            } catch (e) {
-                console.error("Error fetching categories", e);
-            }
+            } catch (e) { console.error(e); }
 
             setArticles(allFetchedArticles);
             setIsFetching(false);
@@ -245,10 +319,7 @@ const AppContent: React.FC = () => {
 
     const filteredArticles = useMemo(() => {
         const filtered = articles.filter(article => article.category === selectedCategory);
-        // Only use fallback if we are NOT in Azad Studio (which has its own mock fallback) and list is empty
-        if (filtered.length === 0 && selectedCategory !== 'azad-studio') {
-             return FALLBACK_ARTICLES;
-        }
+        if (filtered.length === 0 && selectedCategory !== 'azad-studio') return FALLBACK_ARTICLES;
         return filtered.length > 0 ? filtered : (selectedCategory === 'azad-studio' ? MOCK_ARTICLES : []);
     }, [articles, selectedCategory]);
 
@@ -275,17 +346,22 @@ const AppContent: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Embed Azad Studio Telegram Channel if selected */}
+                        {/* Azad Studio Exclusive Layout */}
                         {selectedCategory === 'azad-studio' && (
-                             <div className="mb-10 bg-neutral-900 rounded-2xl overflow-hidden border border-amber-900/30 shadow-2xl h-[500px] md:h-[600px] relative group">
-                                <div className="absolute top-0 left-0 w-full bg-amber-600 text-black text-xs font-bold text-center py-1 z-10 tracking-widest">
-                                    OFFICIAL CHANNEL LIVE VIEW
+                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                                <div className="lg:col-span-2 bg-neutral-900 rounded-2xl overflow-hidden border border-amber-900/30 shadow-2xl h-[500px] md:h-[600px] relative group">
+                                    <div className="absolute top-0 left-0 w-full bg-amber-600 text-black text-xs font-bold text-center py-1 z-10 tracking-widest">
+                                        OFFICIAL CHANNEL LIVE VIEW
+                                    </div>
+                                    <iframe 
+                                        src="https://t.me/s/AzadStudioOfficial?embed=1" 
+                                        className="w-full h-full border-0 mt-5 bg-neutral-900"
+                                        title="Azad Studio Telegram"
+                                    ></iframe>
                                 </div>
-                                <iframe 
-                                    src="https://t.me/s/AzadStudioOfficial?embed=1" 
-                                    className="w-full h-full border-0 mt-5 bg-neutral-900"
-                                    title="Azad Studio Telegram"
-                                ></iframe>
+                                <div className="lg:col-span-1">
+                                    <RSSFeedWidget articles={filteredArticles.slice(0, 20)} />
+                                </div>
                             </div>
                         )}
                         
@@ -301,6 +377,8 @@ const AppContent: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-black flex flex-col">
+            {showWelcome && <WelcomeOverlay onDismiss={() => setShowWelcome(false)} />}
+            
             <Header onFoundersClick={() => setCurrentView('founders')} />
             <BreakingNewsTicker />
 
@@ -325,16 +403,11 @@ const AppContent: React.FC = () => {
 
             <footer className="p-8 bg-neutral-950 border-t border-neutral-900 text-center">
                 <div className="flex flex-col items-center gap-4 mb-8">
-                     <img 
-                        src={LOGO_URL} 
-                        alt="News Pulse AI" 
-                        className="w-12 h-12 opacity-80 rounded-full border border-neutral-800 grayscale hover:grayscale-0 transition-all" 
-                    />
+                     <img src={LOGO_URL} alt="Logo" className="w-12 h-12 opacity-80 rounded-full border border-neutral-800 grayscale hover:grayscale-0 transition-all" />
                     <div className="max-w-md">
                          <h4 className="text-amber-500 font-bold text-sm mb-2">News Pulse AI</h4>
                          <p className="text-gray-500 text-xs leading-relaxed">
                              Breaking language barriers with AI-powered news translation and text-to-speech.
-                             Bringing you news in your language, anytime, anywhere.
                          </p>
                     </div>
                 </div>
@@ -348,44 +421,24 @@ const AppContent: React.FC = () => {
     );
 };
 
-// --- App Wrapper ---
 const App: React.FC = () => {
   return (
     <SubscriptionProvider>
         <style>{`
-            /* Hide scrollbar for Chrome, Safari and Opera */
-            .no-scrollbar::-webkit-scrollbar {
-                display: none;
-            }
-            /* Hide scrollbar for IE, Edge and Firefox */
-            .no-scrollbar {
-                -ms-overflow-style: none;  /* IE and Edge */
-                scrollbar-width: none;  /* Firefox */
-            }
-            .animate-marquee {
-                animation: marquee 120s linear infinite;
-            }
-            @keyframes marquee {
-                0% { transform: translateX(100%); }
-                100% { transform: translateX(-100%); }
-            }
-            .animate-fade-in {
-                animation: fadeIn 0.5s ease-in-out;
-            }
-            .animate-fade-in-fast {
-                animation: fadeIn 0.2s ease-in-out;
-            }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-pulse-slow {
-                animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-            }
-            @keyframes pulse-slow {
-                0%, 100% { opacity: 1; }
-                50% { opacity: .8; }
-            }
+            /* Scrollbar Hiding */
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            
+            /* Animations */
+            .animate-marquee { animation: marquee 120s linear infinite; }
+            @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+            
+            .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
+            .animate-fade-in-fast { animation: fadeIn 0.2s ease-in-out; }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            
+            .animate-pulse-slow { animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+            @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: .8; } }
         `}</style>
       <AppContent />
     </SubscriptionProvider>
