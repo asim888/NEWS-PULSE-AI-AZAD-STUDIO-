@@ -1,13 +1,12 @@
-
 import { Article, CategoryID } from '../types';
 import { RSS_FEED_URLS, CATEGORY_FALLBACKS } from '../constants';
 import { getArticlesFromDB, saveArticlesToDB } from './storageService';
 import { supabase } from './supabaseClient';
 
-// Proxies for RSS Fetching
+// Proxies for RSS Fetching - Reordered to favor faster/more reliable ones first
 const PROXY_LIST = [
+    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`, // Usually faster
     (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
     (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
 ];
 
@@ -34,11 +33,14 @@ const generateStableId = (link: string, category: string): string => {
 
 const fetchUrlViaProxy = async (targetUrl: string): Promise<string> => {
     let lastError;
+    // Timeout reduced to 5s for faster failover
+    const TIMEOUT_MS = 5000; 
+
     for (const createProxyUrl of PROXY_LIST) {
         try {
             const url = createProxyUrl(targetUrl);
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s Timeout
+            const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
             const response = await fetch(url, { signal: controller.signal });
             clearTimeout(timeoutId);

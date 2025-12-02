@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Article, Translation, LanguageCode } from '../types';
 import { LANGUAGES, BRANDING_ASSET_URL, LOGO_URL } from '../constants';
@@ -24,7 +25,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
   const [summaryLanguage, setSummaryLanguage] = useState<LanguageCode>('ur-ro');
   const [summaryTranslation, setSummaryTranslation] = useState<string>('');
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   // --- Audio State ---
   const [playingSection, setPlayingSection] = useState<'main' | 'summary' | null>(null);
@@ -33,33 +33,27 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
   const [enhancedContent, setEnhancedContent] = useState<EnhancedContent | null>(null);
   const [isGenerating, setIsGenerating] = useState(true);
   const [isFromCache, setIsFromCache] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadContent = useCallback(async () => {
-      setIsGenerating(true);
-      setError(null);
-      try {
-          const data = await generateEnhancedContent(article.content, article.id);
-          setEnhancedContent(data);
-          // Basic heuristic: if we got data instantly (fast), it's likely cached
-          if (data.romanUrduSummary) {
-              setSummaryTranslation(data.romanUrduSummary);
-          }
-          setIsFromCache(true); // Assume success from DB
-      } catch (err) {
-          console.error("Failed to load enhanced content", err);
-          setError("Failed to generate AI content. Please check your connection.");
-      } finally {
-          setIsGenerating(false);
-      }
-  }, [article.content, article.id]);
 
   // 1. Load Enhanced Content (Full Article + Summaries) on Mount
   useEffect(() => {
       let isMounted = true;
-      if (isMounted) loadContent();
+      const loadContent = async () => {
+          setIsGenerating(true);
+          const data = await generateEnhancedContent(article.content, article.id);
+          if (isMounted) {
+              setEnhancedContent(data);
+              // Basic heuristic: if we got data instantly (fast), it's likely cached
+              // In a real app, the service would return a metadata flag
+              if (data.romanUrduSummary) {
+                  setSummaryTranslation(data.romanUrduSummary);
+              }
+              setIsGenerating(false);
+              setIsFromCache(true); // Assume success from DB
+          }
+      };
+      loadContent();
       return () => { isMounted = false; stopSpeaking(); };
-  }, [loadContent]);
+  }, [article.id, article.content]);
 
 
   // 2. Logic: What to display in Main Area?
@@ -104,8 +98,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
       setTranslations(prev => [...prev, { lang: langCode, text: translatedText }]);
     } catch (error) {
       console.error('Translation failed', error);
-      // Don't revert language immediately, show error state or fallback
-      // But for now, keeping current language allows retry if they click again
+      setCurrentLanguage('en'); 
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +109,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
       stopSpeaking(); // IMPORTANT: Stop audio when language changes
       setPlayingSection(null);
       setSummaryLanguage(langCode);
-      setSummaryError(null);
 
       if (langCode === 'en') {
           return; 
@@ -137,7 +129,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
           setSummaryTranslation(text);
       } catch (error) {
           console.error('Summary translation failed', error);
-          setSummaryError("Failed to translate summary.");
       } finally {
           setIsSummaryLoading(false);
       }
@@ -197,10 +188,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
       }
   };
 
-  const handleRetry = () => {
-      loadContent();
-  };
-
   return (
     <div className="p-4 md:p-6 animate-fade-in max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -208,7 +195,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
             <BackIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             Back to Feed
         </button>
-        {isFromCache && !isGenerating && !error && (
+        {isFromCache && !isGenerating && (
             <span className="text-[10px] text-green-500/80 uppercase tracking-widest font-bold border border-green-900/30 px-2 py-1 rounded bg-green-900/10 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                 Cloud Sync Active
@@ -255,7 +242,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
                         value={currentLanguage}
                         onChange={(e) => handleTranslateMain(e.target.value as LanguageCode)}
                         className="w-full md:w-64 appearance-none bg-neutral-900 text-amber-100 border border-neutral-700 hover:border-amber-600 rounded-xl px-4 py-3 pr-8 focus:outline-none focus:ring-2 focus:ring-amber-900 transition-all font-medium cursor-pointer"
-                        disabled={isLoading || isGenerating || !!error}
+                        disabled={isLoading || isGenerating}
                     >
                         {LANGUAGES.map(lang => (
                             <option key={lang.code} value={lang.code}>
@@ -272,8 +259,8 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
             <div className="flex flex-col items-center">
                 <button 
                     onClick={handleToggleMainSpeech}
-                    disabled={isLoading || isGenerating || !!error}
-                    className={`group relative w-20 h-20 flex items-center justify-center rounded-full transition-all duration-300 ${playingSection === 'main' ? 'scale-110' : 'hover:scale-105'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    disabled={isLoading || isGenerating}
+                    className={`group relative w-20 h-20 flex items-center justify-center rounded-full transition-all duration-300 ${playingSection === 'main' ? 'scale-110' : 'hover:scale-105'}`}
                 >
                     <div className={`absolute inset-0 bg-amber-500 rounded-full blur-md opacity-20 group-hover:opacity-40 transition-opacity ${playingSection === 'main' ? 'animate-ping opacity-30' : ''}`}></div>
                     <div className="relative w-16 h-16 bg-gradient-to-b from-neutral-800 to-black rounded-full border border-amber-900/50 shadow-[0_4px_0_rgb(0,0,0),0_5px_10px_rgba(0,0,0,0.5)] group-active:translate-y-1 group-active:shadow-none flex items-center justify-center">
@@ -304,16 +291,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
                      {isGenerating ? "AI is generating full article coverage..." : "Translating full article..."}
                  </span>
               </div>
-            ) : error ? (
-                <div className="flex flex-col justify-center items-center h-60 gap-4 text-center">
-                    <p className="text-red-400 text-lg">{error}</p>
-                    <button 
-                        onClick={handleRetry} 
-                        className="px-6 py-2 bg-amber-600 text-black font-bold rounded-full hover:bg-amber-500 transition-colors"
-                    >
-                        Retry Generation
-                    </button>
-                </div>
             ) : (
               <div className="whitespace-pre-wrap">
                  <p className="first-letter:text-5xl first-letter:font-serif first-letter:text-amber-500 first-letter:mr-2 first-letter:float-left leading-loose">
@@ -324,7 +301,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
           </div>
           
           {/* --- SUMMARY SECTION --- */}
-          {!isGenerating && !error && enhancedContent?.shortSummary && (
+          {!isGenerating && enhancedContent?.shortSummary && (
               <div className="mt-16 bg-black/60 border-l-4 border-amber-500 p-6 rounded-r-xl relative animate-fade-in">
                    
                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
@@ -359,7 +336,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
                             ? 'bg-amber-900/40 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]' 
                             : 'bg-neutral-800 border-amber-900/30 text-amber-500/70 hover:text-amber-400 hover:border-amber-600'
                         }`}
-                        disabled={isSummaryLoading}
                       >
                          <MicIcon3D className="w-4 h-4" isActive={playingSection === 'summary'} />
                          <span className="text-[10px] font-bold uppercase tracking-wide">
@@ -373,8 +349,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
                           <div className="flex items-center gap-2 text-amber-500/50 text-sm animate-pulse">
                               Translating summary...
                           </div>
-                      ) : summaryError ? (
-                          <div className="text-red-400 text-sm">{summaryError}</div>
                       ) : (
                           <p className="text-gray-300 italic font-serif leading-relaxed text-sm md:text-base border-t border-dashed border-neutral-700 pt-3">
                               {displayedSummaryContent || "Summary unavailable."}

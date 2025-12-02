@@ -192,7 +192,7 @@ const FoundersSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
                 <div key={founder.name} className="bg-neutral-900 p-6 rounded-xl flex flex-col items-center text-center shadow-2xl border border-amber-900/30 hover:border-amber-600/50 transition-colors relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-600 to-transparent transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                     <div className="p-1 bg-gradient-to-br from-amber-400 to-yellow-700 rounded-full mb-4">
-                         <img src={founder.imageUrl} alt={founder.name} className="w-32 h-32 rounded-full border-4 border-black object-cover"/>
+                         <img src={founder.imageUrl} alt={founder.name} className="w-48 h-48 rounded-full border-4 border-black object-cover"/>
                     </div>
                     <h3 className="text-xl font-bold text-amber-50 mb-1">{founder.name}</h3>
                     <span className="text-amber-500 text-xs font-bold uppercase tracking-wider mb-4 block">{founder.role}</span>
@@ -215,7 +215,7 @@ const FoundersSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
 const AppContent: React.FC = () => {
     type View = 'feed' | 'article' | 'founders';
 
-    const [articles, setArticles] = useState<Article[]>(MOCK_ARTICLES);
+    const [articles, setArticles] = useState<Article[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<CategoryID>('azad-studio');
     const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
     const [currentView, setCurrentView] = useState<View>('feed');
@@ -229,28 +229,30 @@ const AppContent: React.FC = () => {
 
         const loadNews = async () => {
             setIsFetching(true);
-            const allFetchedArticles: Article[] = [];
+            setArticles([]); // Clear on mount/refresh
+
+            // Define categories
+            const categoriesToFetch: CategoryID[] = ['azad-studio', 'hyderabad', 'telangana', 'india', 'international', 'sports'];
             
-            // 1. Fetch Azad Studio from RSS
-            try {
-                const azadNews = await fetchCategoryNews('azad-studio');
-                if (azadNews.length > 0) allFetchedArticles.push(...azadNews);
-                else allFetchedArticles.push(...MOCK_ARTICLES);
-            } catch (e) {
-                allFetchedArticles.push(...MOCK_ARTICLES);
-            }
+            // Progressive Loading: Update state individually as each category resolves
+            const fetchPromises = categoriesToFetch.map(async (cat) => {
+                try {
+                    const news = await fetchCategoryNews(cat);
+                    if (news && news.length > 0) {
+                        setArticles(prev => {
+                            // Deduplicate based on ID
+                            const newIds = new Set(news.map(n => n.id));
+                            const filteredPrev = prev.filter(p => !newIds.has(p.id));
+                            return [...filteredPrev, ...news];
+                        });
+                    }
+                } catch (e) {
+                    console.warn(`Failed to fetch ${cat}`, e);
+                }
+            });
 
-            // 2. Fetch others in parallel
-            const categoriesToFetch: CategoryID[] = ['hyderabad', 'telangana', 'india', 'international', 'sports'];
-            try {
-                const promises = categoriesToFetch.map(cat => fetchCategoryNews(cat));
-                const results = await Promise.all(promises);
-                results.forEach(news => {
-                    if (news && news.length > 0) allFetchedArticles.push(...news);
-                });
-            } catch (e) { console.error(e); }
-
-            setArticles(allFetchedArticles);
+            // Wait for all to finish to stop spinner, but UI updates progressively
+            await Promise.all(fetchPromises);
             setIsFetching(false);
         };
 
@@ -280,8 +282,16 @@ const AppContent: React.FC = () => {
 
     const filteredArticles = useMemo(() => {
         const filtered = articles.filter(article => article.category === selectedCategory);
-        if (filtered.length === 0 && selectedCategory !== 'azad-studio') return FALLBACK_ARTICLES;
-        return filtered.length > 0 ? filtered : (selectedCategory === 'azad-studio' ? MOCK_ARTICLES : []);
+        
+        // For Azad Studio: If empty, return EMPTY array (so no cards show, only iframes)
+        if (selectedCategory === 'azad-studio') {
+            return filtered; 
+        }
+
+        // For other categories: If empty, show fallback content
+        if (filtered.length === 0) return FALLBACK_ARTICLES;
+        
+        return filtered; 
     }, [articles, selectedCategory]);
 
     const renderView = () => {
@@ -334,6 +344,7 @@ const AppContent: React.FC = () => {
                             </div>
                         )}
                         
+                        {/* Only show grid if there are actual articles */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                             {filteredArticles.map(article => (
                                 <ArticleCard key={article.id} article={article} onSelect={handleArticleSelect} />
