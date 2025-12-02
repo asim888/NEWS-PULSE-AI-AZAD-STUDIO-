@@ -192,7 +192,7 @@ const FoundersSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
                 <div key={founder.name} className="bg-neutral-900 p-6 rounded-xl flex flex-col items-center text-center shadow-2xl border border-amber-900/30 hover:border-amber-600/50 transition-colors relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-600 to-transparent transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                     <div className="p-1 bg-gradient-to-br from-amber-400 to-yellow-700 rounded-full mb-4">
-                         <img src={founder.imageUrl} alt={founder.name} className="w-48 h-48 rounded-full border-4 border-black object-cover"/>
+                         <img src={founder.imageUrl} alt={founder.name} className="w-32 h-32 rounded-full border-4 border-black object-cover"/>
                     </div>
                     <h3 className="text-xl font-bold text-amber-50 mb-1">{founder.name}</h3>
                     <span className="text-amber-500 text-xs font-bold uppercase tracking-wider mb-4 block">{founder.role}</span>
@@ -215,7 +215,7 @@ const FoundersSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
 const AppContent: React.FC = () => {
     type View = 'feed' | 'article' | 'founders';
 
-    const [articles, setArticles] = useState<Article[]>([]);
+    const [articles, setArticles] = useState<Article[]>(MOCK_ARTICLES);
     const [selectedCategory, setSelectedCategory] = useState<CategoryID>('azad-studio');
     const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
     const [currentView, setCurrentView] = useState<View>('feed');
@@ -234,16 +234,13 @@ const AppContent: React.FC = () => {
             // 1. Fetch Azad Studio from RSS
             try {
                 const azadNews = await fetchCategoryNews('azad-studio');
-                if (azadNews.length > 0) {
-                    allFetchedArticles.push(...azadNews);
-                } 
-                // DO NOT add MOCK_ARTICLES fallback for Azad Studio.
-                // We want to show ONLY the iframes if news fetch fails.
+                if (azadNews.length > 0) allFetchedArticles.push(...azadNews);
+                else allFetchedArticles.push(...MOCK_ARTICLES);
             } catch (e) {
-                console.warn("Azad fetch failed, showing iframe only.");
+                allFetchedArticles.push(...MOCK_ARTICLES);
             }
 
-            // 2. Fetch other categories in parallel
+            // 2. Fetch others in parallel
             const categoriesToFetch: CategoryID[] = ['hyderabad', 'telangana', 'india', 'international', 'sports'];
             try {
                 const promises = categoriesToFetch.map(cat => fetchCategoryNews(cat));
@@ -283,16 +280,8 @@ const AppContent: React.FC = () => {
 
     const filteredArticles = useMemo(() => {
         const filtered = articles.filter(article => article.category === selectedCategory);
-        
-        // For Azad Studio: If empty, return EMPTY array (so no cards show, only iframes)
-        if (selectedCategory === 'azad-studio') {
-            return filtered; 
-        }
-
-        // For other categories: If empty, show fallback content
-        if (filtered.length === 0) return FALLBACK_ARTICLES;
-        
-        return filtered; 
+        if (filtered.length === 0 && selectedCategory !== 'azad-studio') return FALLBACK_ARTICLES;
+        return filtered.length > 0 ? filtered : (selectedCategory === 'azad-studio' ? MOCK_ARTICLES : []);
     }, [articles, selectedCategory]);
 
     const renderView = () => {
